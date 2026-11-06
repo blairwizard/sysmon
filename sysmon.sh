@@ -1,8 +1,18 @@
 #!/bin/bash
 
-while true; do
-        clear
+snapshot() {
+        local i=0 name user nice system idle iowait irq softirq steal rest
+        names=(); total=(); idles=()
 
+        while read -r name user nice system idle iowait irq softirq steal rest; do
+                names[i]=$name
+                total[i]=$(( user + nice + system + idle + iowait + irq + softirq + steal ))
+                idles[i]=$(( idle + iowait ))
+                i=$(( i + 1 ))
+        done < <(grep '^cpu' /proc/stat)
+}
+
+while true; do
         read -r memt mema <<< "$(awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2} END {print t, a}' /proc/meminfo)"
 
         if [ -z "$memt" ]; then
@@ -21,22 +31,41 @@ while true; do
                 memusage=$(echo "scale=1; (($memt-$mema)*100)/$memt" | bc)
         fi
 
+        snapshot
+        total1=("${total[@]}")
+        idles1=("${idles[@]}")
+        sleep 1
+        snapshot
+
+        cols=4
+        overall=""
+        grid=""
+        for i in "${!total[@]}"; do
+                dt=$(( total[i] - total1[i] ))
+                di=$(( idles[i] - idles1[i] ))
+
+                if [ "$dt" -le 0 ]; then
+                        usage="n/a"
+                else
+                        usage=$(echo "scale=1; (($dt-$di)*100)/$dt" | bc)
+                fi
+
+                if [ "$i" -eq 0 ]; then
+                        overall=" Overall CPU = $usage %"
+                else
+                        printf -v cell ' Core %-2s %5s %%  ' "${names[i]#cpu}" "$usage"
+                        grid+=$cell
+                        if (( i % cols == 0 )); then
+                                grid+=$'\n'
+                        fi
+                fi
+        done
+
+        clear
         echo -e " Total memory = $memt kb \n Available Memory = $mema kb"
         echo " Memory usage = $memusage %"
         echo
-
-        read -r timesum idle <<< "$(awk '/^cpu / {t=$2+$3+$4+$5+$6+$7+$8+$9; i=$5+$6; print t, i}' /proc/stat)"
-        read -r timesum1 idle1 <<< "$(awk '/^cpu / {t=$2+$3+$4+$5+$6+$7+$8+$9; i=$5+$6; print t, i}' /proc/stat)"
-
-        del1=$((timesum1-timesum))
-        del2=$((idle1-idle))
-
-        if [ "$del1" -le 0 ]; then
-                echo "Error: CPU counters did not advance"
-                exit 1
-        fi
-
-        cpuusage=$(echo "scale=1; (($del1-$del2)*100)/$del1" | bc)
-        echo " CPU usage = $cpuusage %"
-        sleep 1
+        echo "$overall"
+        echo
+        echo "$grid"
 done
