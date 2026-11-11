@@ -34,7 +34,6 @@ while true; do
         snapshot
         total1=("${total[@]}")
         idles1=("${idles[@]}")
-        sleep 1
         snapshot
 
         cols=4
@@ -52,6 +51,13 @@ while true; do
 
                 if [ "$i" -eq 0 ]; then
                         overall=" Overall CPU = $usage %"
+                        pct=$(printf "%.0f" "$usage")
+                        width=100
+                        filled=$(( pct * width / 100 ))
+                        for (( j=0; j<width; j++ )); do
+                        if (( j < filled )); then printf '█'; else printf '░'; fi
+                        done
+                        echo
                 else
                         printf -v cell ' Core %-2s %5s %%  ' "${names[i]#cpu}" "$usage"
                         grid+=$cell
@@ -68,4 +74,5 @@ while true; do
         echo "$overall"
         echo
         echo "$grid"
+        sleep 1
 done
