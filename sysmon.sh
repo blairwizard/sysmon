@@ -48,7 +48,6 @@ while true; do
                 else
                         usage=$(echo "scale=1; (($dt-$di)*100)/$dt" | bc)
                 fi
-
                 if [ "$i" -eq 0 ]; then
                         overall=" Overall CPU = $usage %"
                         pct=$(printf "%.0f" "$usage")
